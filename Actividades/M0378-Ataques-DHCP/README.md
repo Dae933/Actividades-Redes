@@ -63,16 +63,22 @@ El bridge **`vmbr1`** es una red interna del nodo `pau`, sin salida física a la
    sudo apt install -y yersinia dhcpstarv
    ```
 6. Se creó la VM víctima: contenedor LXC Alpine 3.24 (`alpine-victima`, CT 104) en `vmbr1`, con red por DHCP, para que reciba el ataque de forma aislada.
+7. Se escribió el script de **DHCP starvation** en Python con `scapy`: [`dhcp_starvation.py`](./dhcp_starvation.py). Construye y envía en bucle paquetes `DHCPDISCOVER` con una dirección MAC de origen aleatoria distinta en cada envío (simulando muchos clientes distintos), para agotar el pool de direcciones de un servidor DHCP legítimo.
+
+   ```bash
+   sudo apt install -y python3-scapy
+   sudo python3 dhcp_starvation.py -i eth0 -n 200
+   ```
+
+   Parámetros: `-i/--iface` (interfaz), `-n/--count` (nº de peticiones, 0 = infinito), `-t/--interval` (segundos entre envíos, por defecto 0.1).
 
 ---
 
 ## 🔜 Lo que vamos a hacer
 
-1. **Escribir el script de ataque en Python con `scapy`**, con dos modos:
-   - *DHCP starvation*: construir y enviar en bucle paquetes `DHCPDISCOVER` con una dirección MAC origen aleatoria distinta en cada envío, para agotar el rango de direcciones de un servidor DHCP legítimo.
-   - *Rogue DHCP server*: escuchar peticiones `DHCPDISCOVER`/`DHCPREQUEST` en `vmbr1` y responder con `DHCPOFFER`/`DHCPACK` suplantando a un servidor legítimo (pudiendo entregar una puerta de enlace o DNS controlados por el atacante).
-2. **Ejecutar el ataque** desde `kali-pau` contra `alpine-victima`, comprobando en la víctima con `udhcpc -i eth0 -f -v` qué ofertas recibe y de quién.
-3. **Capturar evidencias** del tráfico DHCP durante el ataque con `tcpdump`/Wireshark en ambas máquinas.
+1. **Ejecutar el script de starvation** desde `kali-pau` contra `alpine-victima` en `vmbr1`, comprobando en la víctima con `udhcpc -i eth0 -f -v` el comportamiento del cliente DHCP durante el ataque.
+2. **Capturar evidencias** del tráfico DHCP durante el ataque con `tcpdump`/Wireshark en ambas máquinas (se debería ver un `DHCPDISCOVER` por cada MAC falsa generada).
+3. **Escribir el script de rogue DHCP server**: escuchar peticiones `DHCPDISCOVER`/`DHCPREQUEST` en `vmbr1` y responder con `DHCPOFFER`/`DHCPACK` suplantando a un servidor legítimo (pudiendo entregar una puerta de enlace o DNS controlados por el atacante), y repetir los pasos 1-2 con este ataque.
 4. **Documentar los resultados** en este README: salida de los scripts, capturas de pantalla y análisis de las tramas DHCP capturadas.
 5. **Tareas arrastradas de la actividad anterior** (DNS tunneling):
    - Añadir aquí o en [M037-Seguridad-DNS-DNSpy](../M037-Seguridad-DNS-DNSpy) las capturas de Wireshark pendientes.

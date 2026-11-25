@@ -24,10 +24,13 @@ Cluster Proxmox del centro (`cluster-fp`), nodos **nodo2** y **pau**.
 
 El bridge **`vmbr1`** es una red interna del nodo `pau`, sin salida física a la red del centro ni a internet. Es la red donde se ejecutará el ataque.
 
-## Infraestructura creada
+---
 
-### VM atacante: `kali-pau` (VMID 103)
+## ✅ Lo que hemos hecho
 
+### Infraestructura
+
+**VM atacante: `kali-pau` (VMID 103)**
 - 2 vCPU, 4 GB RAM, 32 GB disco, sin entorno gráfico.
 - Usuario `pau` / contraseña `123456`.
 - Instalación base de Kali con el conjunto de paquetes "top10 + default".
@@ -36,15 +39,14 @@ El bridge **`vmbr1`** es una red interna del nodo `pau`, sin salida física a la
 - Idioma del sistema: `es_ES.UTF-8`.
 - Acceso por SSH habilitado (`openssh-server`), para evitar los problemas de mapeo de teclado de la consola web de Proxmox (símbolos `; - /` mal interpretados por diferencia de idioma de teclado).
 
-### VM víctima: `alpine-victima` (CT 104)
-
+**VM víctima: `alpine-victima` (CT 104)**
 - Contenedor LXC sin privilegios, plantilla **Alpine Linux 3.24** (descargada del catálogo oficial de Proxmox).
 - 1 núcleo, 512 MiB RAM, 8 GiB disco.
 - **`eth0`** en `vmbr1` (misma red aislada que la Kali), IP por **DHCP**.
 - Usuario `root` / contraseña `123456`.
 - Al arrancar, el cliente DHCP de Alpine (`udhcpc`) queda pidiendo IP sin recibir respuesta, porque `vmbr1` no tiene ningún servidor DHCP: es la situación de partida para lanzar el ataque.
 
-## Preparación realizada
+### Pasos realizados
 
 1. Se detectó que `kali-pau` solo tenía `eth0` en `vmbr1` (red aislada, sin DNS ni gateway), por lo que no tenía forma de instalar `yersinia` ni `dhcpstarv`.
 2. Se añadió una segunda interfaz de red (`net1`) en `vmbr0` desde Proxmox, y se configuró con IP fija `192.168.135.150/24` + gateway + DNS, primero a mano y después de forma permanente mediante un archivo en `/etc/network/interfaces.d/`.
@@ -60,14 +62,19 @@ El bridge **`vmbr1`** es una red interna del nodo `pau`, sin salida física a la
    ```
 6. Se creó la VM víctima: contenedor LXC Alpine 3.24 (`alpine-victima`, CT 104) en `vmbr1`, con red por DHCP, para que reciba el ataque de forma aislada.
 
-## Pendiente
+---
 
-- [ ] Escribir el script en Python/`scapy` para el ataque DHCP (starvation y/o rogue server).
-- [ ] Ejecutar el ataque en el entorno aislado y verificar el comportamiento del cliente víctima (`udhcpc -i eth0 -f -v`).
-- [ ] Capturar evidencias con `tcpdump`/Wireshark del tráfico DHCP durante el ataque.
-- [ ] Documentar aquí los resultados, con capturas de pantalla y el análisis del tráfico.
-- [ ] Añadir capturas de Wireshark de la actividad anterior de DNS tunneling (arrastrado de [M037-Seguridad-DNS-DNSpy](../M037-Seguridad-DNS-DNSpy)).
-- [ ] Borrar el `captura_cliente.iso` suelto en *Datacenter → pau → local → Imágenes ISO* (arrastrado).
+## 🔜 Lo que vamos a hacer
+
+1. **Escribir el script de ataque en Python con `scapy`**, con dos modos:
+   - *DHCP starvation*: construir y enviar en bucle paquetes `DHCPDISCOVER` con una dirección MAC origen aleatoria distinta en cada envío, para agotar el rango de direcciones de un servidor DHCP legítimo.
+   - *Rogue DHCP server*: escuchar peticiones `DHCPDISCOVER`/`DHCPREQUEST` en `vmbr1` y responder con `DHCPOFFER`/`DHCPACK` suplantando a un servidor legítimo (pudiendo entregar una puerta de enlace o DNS controlados por el atacante).
+2. **Ejecutar el ataque** desde `kali-pau` contra `alpine-victima`, comprobando en la víctima con `udhcpc -i eth0 -f -v` qué ofertas recibe y de quién.
+3. **Capturar evidencias** del tráfico DHCP durante el ataque con `tcpdump`/Wireshark en ambas máquinas.
+4. **Documentar los resultados** en este README: salida de los scripts, capturas de pantalla y análisis de las tramas DHCP capturadas.
+5. **Tareas arrastradas de la actividad anterior** (DNS tunneling):
+   - Añadir aquí o en [M037-Seguridad-DNS-DNSpy](../M037-Seguridad-DNS-DNSpy) las capturas de Wireshark pendientes.
+   - Borrar el `captura_cliente.iso` suelto en *Datacenter → pau → local → Imágenes ISO*.
 
 ## Notas de seguridad
 
